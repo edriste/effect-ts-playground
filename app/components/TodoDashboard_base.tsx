@@ -21,19 +21,54 @@ export default function TodoDashboard() {
   const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
-    let active = true
+    let active = true // manual flag to prevent state updates after unmount
 
     async function loadData() {
+      setLoading(true)
+      setError(null)
+
+      // 👇 Simulate an unreliable network (random failure)
+      const simulateNetworkInstability = () => Math.random() < 0.4 // 40% chance to "fail"
+
       try {
-        setLoading(true)
+        // Manual retry loop - duplicated logic
+        let attempts = 0
+        let todosRes: Response | null = null
+        let userRes: Response | null = null
 
-        const [todosRes, userRes] = await Promise.all([
-          fetch("https://jsonplaceholder.typicode.com/todos?_limit=5"),
-          fetch("https://jsonplaceholder.typicode.com/users/1"),
-        ])
+        while (attempts < 3) {
+          try {
+            // Manual timeout using AbortController
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 3000) // 3s
 
-        if (!todosRes.ok || !userRes.ok) {
-          throw new Error("Failed to fetch data")
+            // Run two parallel fetches
+            const [tRes, uRes] = await Promise.all([
+              fetch("https://jsonplaceholder.typicode.com/todos?_limit=5", {
+                signal: controller.signal,
+              }),
+              fetch("https://jsonplaceholder.typicode.com/users/1", {
+                signal: controller.signal,
+              }),
+            ])
+
+            clearTimeout(timeout)
+
+            // Artificial random network failure
+            if (simulateNetworkInstability()) throw new Error("Network error")
+
+            todosRes = tRes
+            userRes = uRes
+            break // success, stop retrying
+          } catch (innerError) {
+            attempts++
+            console.warn(`Retry attempt ${attempts} failed:`, innerError)
+            if (attempts >= 3) throw innerError // give up
+          }
+        }
+
+        if (!todosRes?.ok || !userRes?.ok) {
+          throw new Error("Bad response from API")
         }
 
         const [todosData, userData] = await Promise.all([
@@ -44,24 +79,32 @@ export default function TodoDashboard() {
         if (active) {
           setTodos(todosData)
           setUser(userData)
-          setError(null)
         }
       } catch (err) {
+        // Unstructured, untyped error handling
         if (active) setError((err as Error).message)
       } finally {
+        // Manual cleanup
         if (active) setLoading(false)
       }
     }
 
     loadData()
 
+    // Manual teardown to prevent state updates on unmounted component
     return () => {
       active = false
     }
   }, [])
 
   if (loading) return <p>Loading dashboard...</p>
-  if (error) return <p style={{ color: "red" }}>Error: {error}</p>
+  if (error)
+    return (
+      <p style={{ color: "red" }}>
+        Error: {error} <br />
+        (Simulated random failures + retries)
+      </p>
+    )
 
   return (
     <div className="space-y-4">
@@ -77,14 +120,3 @@ export default function TodoDashboard() {
     </div>
   )
 }
-
-// no type-safe async composition
-// no automatic resource management & retries
-// no dependency injection
-// no deterministic, testable effects
-
-// but
-
-// simpler React code
-                                                                                                                                                                                                                                                                                                    
-                                                                                                                                                                                                                                                                                                    

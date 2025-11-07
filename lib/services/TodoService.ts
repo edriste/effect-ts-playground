@@ -1,4 +1,5 @@
 import { Effect, Layer, Context, Schedule } from "effect";
+import { flakyFetch } from "../utils";
 
 export interface Todo {
   id: number;
@@ -19,7 +20,7 @@ export const TodoServiceLive = Layer.succeed(TodoServiceTag, {
     const todos = yield* _(
       Effect.tryPromise<Todo[], Error>({
         try: () =>
-          fetch("https://jsonplaceholder.typicode.com/todos?_limit=5").then(
+          flakyFetch("https://jsonplaceholder.typicode.com/todos?_limit=5").then(
             (r) => r.json()
           ),
         catch: (e) => new Error(`Failed to fetch todos: ${String(e)}`),
